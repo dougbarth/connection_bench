@@ -1,9 +1,10 @@
 require 'socket'
 
-server = TCPServer.new(2000) # Server bind to port 2000
-loop do
+port = (ARGV[0] || 8080).to_i
+
+Socket.tcp_server_loop(port) do |client, addr_info|
+  STDOUT.print '.'; STDOUT.flush
   begin
-    client = server.accept    # Wait for a client to connect
     client.puts "Hello !"
     client.puts "Time is #{Time.now}"
   rescue

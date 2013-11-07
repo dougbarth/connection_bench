@@ -1,6 +1,7 @@
 require 'socket'
 
-server_host = ARGV[0]
+server_host, server_port = ARGV[0].split(':')
+server_port = (server_port || 8080).to_i
 connection_rate = (ARGV[1] || 100).to_i
 
 output_interval = 1
@@ -60,7 +61,7 @@ Thread.new do
 end
 
 timer.each_tick do
-  s = TCPSocket.new(server_host, 2000)
+  s = TCPSocket.new(server_host, server_port)
 
   while line = s.gets # Read lines from socket
     #puts line         # and print them
