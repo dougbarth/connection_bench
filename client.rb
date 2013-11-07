@@ -1,8 +1,10 @@
 require 'socket'
 
-server_host, server_port = ARGV[0].split(':')
+server_host, server_port = (ARGV[0] || '').split(':')
 server_port = (server_port || 8080).to_i
+
 connection_rate = (ARGV[1] || 100).to_i
+concurrency = (ARGV[2] || 1).to_i
 
 output_interval = 1
 next_output_time = Time.now + output_interval
@@ -45,11 +47,11 @@ class Timer
   end
 end
 
-timer = Timer.new(connection_rate, "connections")
+timers = concurrency.times.map {|i| Timer.new(connection_rate, "connection source #{i}") }
 output_timer = Timer.new(1/output_interval.to_f, "output")
 
 trap("INT") do
-  timer.stop
+  timers.each(&:stop)
   output_timer.stop
 end
 
@@ -60,16 +62,21 @@ Thread.new do
   end
 end
 
-timer.each_tick do
-  s = TCPSocket.new(server_host, server_port)
+connection_threads = timers.map do |timer|
+  Thread.new do
+    timer.each_tick do
+      s = TCPSocket.new(server_host, server_port)
 
-  while line = s.gets # Read lines from socket
-    #puts line         # and print them
+      while line = s.gets # Read lines from socket
+        #puts line         # and print them
+      end
+
+      s.close             # close socket when done
+
+      total_cxns += 1
+      connections += 1
+    end
   end
-
-  s.close             # close socket when done
-
-  total_cxns += 1
-  connections += 1
 end
 
+connection_threads.each {|t| t.join }
