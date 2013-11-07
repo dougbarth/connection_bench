@@ -1,5 +1,7 @@
 require 'socket'
 
+Thread.abort_on_exception = true
+
 server_host, server_port = (ARGV[0] || '').split(':')
 server_port = (server_port || 8080).to_i
 
@@ -48,17 +50,6 @@ end
 timers = concurrency.times.map {|i| Timer.new(connection_rate, "connection source #{i}") }
 output_timer = Timer.new(1/output_interval.to_f, "output")
 
-already_tried_stopping = false
-trap("INT") do
-  if already_tried_stopping
-    exit(1)
-  else
-    timers.each(&:stop)
-    output_timer.stop
-    already_tried_stopping = true
-  end
-end
-
 Thread.new do
   output_timer.each_tick do
     puts "#{Time.now} - Connections/s = #{connections / output_interval}, Total connections = #{total_cxns}"
@@ -71,15 +62,22 @@ connection_threads = timers.map do |timer|
     timer.each_tick do
       s = TCPSocket.new(server_host, server_port)
 
-      while line = s.gets # Read lines from socket
-        #puts line         # and print them
-      end
-
       s.close             # close socket when done
 
       total_cxns += 1
       connections += 1
     end
+  end
+end
+
+already_tried_stopping = false
+trap("INT") do
+  if already_tried_stopping
+    connection_threads.each {|t| t.raise("WHY WON'T YOU DIE?") }
+  else
+    timers.each(&:stop)
+    output_timer.stop
+    already_tried_stopping = true
   end
 end
 
