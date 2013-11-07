@@ -1,4 +1,5 @@
 require 'socket'
+require 'thread'
 
 Thread.abort_on_exception = true
 
@@ -13,6 +14,8 @@ next_output_time = Time.now + output_interval
 
 total_cxns = 0
 connections = 0
+
+counter_mutex = Mutex.new
 
 class Timer
   def initialize(frequency, name = nil)
@@ -53,7 +56,9 @@ output_timer = Timer.new(1/output_interval.to_f, "output")
 Thread.new do
   output_timer.each_tick do
     puts "#{Time.now} - Connections/s = #{connections / output_interval}, Total connections = #{total_cxns}"
-    connections = 0
+    counter_mutex.synchronize do
+      connections = 0
+    end
   end
 end
 
@@ -64,8 +69,10 @@ connection_threads = timers.map do |timer|
 
       s.close             # close socket when done
 
-      total_cxns += 1
-      connections += 1
+      counter_mutex.synchronize do
+        total_cxns += 1
+        connections += 1
+      end
     end
   end
 end
