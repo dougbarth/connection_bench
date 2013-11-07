@@ -33,6 +33,7 @@ class Timer
       if missed > 0
         missed.times do
           yield
+          break unless @keep_going
         end
 
         @fired_up_to = @fired_up_to + missed * @tick_interval
@@ -50,9 +51,15 @@ end
 timers = concurrency.times.map {|i| Timer.new(connection_rate, "connection source #{i}") }
 output_timer = Timer.new(1/output_interval.to_f, "output")
 
+already_tried_stopping = false
 trap("INT") do
-  timers.each(&:stop)
-  output_timer.stop
+  if already_tried_stopping
+    exit(1)
+  else
+    timers.each(&:stop)
+    output_timer.stop
+    already_tried_stopping = true
+  end
 end
 
 Thread.new do
