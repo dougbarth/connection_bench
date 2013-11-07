@@ -21,7 +21,6 @@ class Timer
 
     @tick_interval = 1 / @frequency.to_f
 
-    @next_fire = Time.now
     @fired_up_to = Time.now
   end
 
@@ -30,14 +29,12 @@ class Timer
       now = Time.now
       missed = ((now - @fired_up_to) * @frequency).floor
 
-      if missed > 0
-        missed.times do
-          yield
-          break unless @keep_going
-        end
-
-        @fired_up_to = @fired_up_to + missed * @tick_interval
+      missed.times do
+        yield
+        break unless @keep_going
       end
+
+      @fired_up_to = @fired_up_to + missed * @tick_interval
 
       sleep(0.001)
     end
