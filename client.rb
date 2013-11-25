@@ -7,7 +7,8 @@ Thread.abort_on_exception = true
 options = {
   :concurrency => 1,
   :output_interval => 1,
-  :connection_rate => 100
+  :connection_rate => 100,
+  :test_length => 10
 }
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby client.rb [options] [server[:port]]"
@@ -22,6 +23,10 @@ OptionParser.new do |opts|
 
   opts.on("-c", "--connection-rate n", "The rate of connections to send per client thread (default: 100)") do |n|
     options[:connection_rate] = n.to_i
+  end
+
+  opts.on("-t", "--time n", "Run the connection test for n seconds (default: 10)") do |n|
+    options[:test_length] = n.to_i
   end
 
   opts.on("-h", "--help", "Print usage") do
@@ -74,6 +79,24 @@ end
 timers = options[:concurrency].times.map {|i| Timer.new(options[:connection_rate], "connection source #{i}") }
 output_timer = Timer.new(1/options[:output_interval].to_f, "output")
 
+already_tried_stopping = false
+stop_timers = lambda do
+  if already_tried_stopping
+    connection_threads.each {|t| t.raise("WHY WON'T YOU DIE?") }
+  else
+    timers.each(&:stop)
+    output_timer.stop
+    already_tried_stopping = true
+  end
+end
+
+trap("INT") { stop_timers.call }
+
+Thread.new do
+  sleep(options[:test_length])
+  stop_timers.call
+end
+
 Thread.new do
   output_timer.each_tick do
     puts "#{Time.now} - Connections/s = #{connections / options[:output_interval]}, Total connections = #{total_cxns}"
@@ -95,17 +118,6 @@ connection_threads = timers.map do |timer|
         connections += 1
       end
     end
-  end
-end
-
-already_tried_stopping = false
-trap("INT") do
-  if already_tried_stopping
-    connection_threads.each {|t| t.raise("WHY WON'T YOU DIE?") }
-  else
-    timers.each(&:stop)
-    output_timer.stop
-    already_tried_stopping = true
   end
 end
 
